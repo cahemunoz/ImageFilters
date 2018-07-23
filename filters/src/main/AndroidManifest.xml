@@ -1,0 +1,15 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.cahemunoz.filters">
+
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <application>
+        <activity
+            android:name="com.cahemunoz.filters.FiltersActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat"
+            android:windowSoftInputMode="stateHidden" />
+
+    </application>
+</manifest>

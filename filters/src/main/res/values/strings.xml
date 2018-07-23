@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Filters</string>
+
+    <string name="brilho_filter">Brilho</string>
+    <string name="contraste_filter">Contraste</string>
+    <string name="saturacao_filter">Saturação</string>
+    <string name="temperatura_filter">Temperatura</string>
+
+    <string name="cancelar_button">Cancelar</string>
+    <string name="concluir_button">Concluir</string>
+</resources>
