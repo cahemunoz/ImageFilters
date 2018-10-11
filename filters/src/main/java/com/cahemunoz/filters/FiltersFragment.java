@@ -2,12 +2,16 @@ package com.cahemunoz.filters;
 
 import android.app.Activity;
 import android.app.Fragment;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -65,6 +69,11 @@ public class FiltersFragment extends Fragment {
     private int filterType;
     private File outputPhoto;
     private Uri inputPhoto;
+    private HandlerThread workingThread;
+    private Handler workingHandler;
+    private Handler uiHandler;
+    private int maxImageWidth;
+    private int maxImageHeight;
 
 
     public interface Callback {
@@ -180,6 +189,17 @@ public class FiltersFragment extends Fragment {
     public void onCreate(Bundle instanceState) {
         super.onCreate(instanceState);
         setHasOptionsMenu(true);
+        workingThread = new HandlerThread("WorkingThread");
+        workingThread.start();
+        workingHandler = new Handler(workingThread.getLooper());
+        uiHandler = new Handler(Looper.getMainLooper());
+    }
+
+
+    public void onDestroy() {
+        workingHandler.removeCallbacks(savePhotoRunnable);
+        workingThread.quit();
+        super.onDestroy();
     }
 
     @Override
@@ -254,43 +274,99 @@ public class FiltersFragment extends Fragment {
         return super.onOptionsItemSelected(item);
     }
 
-    private void savePhoto() {
-        final Callback callback = (Callback) getActivity();
-        new AsyncTask<Void, Void, Void>() {
-            @Override
-            protected void onPreExecute() {
-                callback.onSave();
+
+    public static int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        // Raw height and width of image
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+
+        if (height > reqHeight || width > reqWidth) {
+
+            final int halfHeight = height / 2;
+            final int halfWidth = width / 2;
+
+            // Calculate the largest inSampleSize value that is a power of 2 and keeps both
+            // height and width larger than the requested height and width.
+            while ((halfHeight / inSampleSize) > reqHeight
+                    && (halfWidth / inSampleSize) > reqWidth) {
+                inSampleSize *= 2;
             }
-            @Override
-            protected void onPostExecute(Void result) {
-                callback.onSaved();
-                Intent intent = new Intent();
-                intent.setData(Uri.fromFile(outputPhoto));
-                getActivity().setResult(Activity.RESULT_OK, intent);
-                getActivity().finish();
+        }
+        return inSampleSize;
+    }
+
+
+    public static Bitmap decodeUriAsBitmap(Context context, Uri uri, int targetWidth, int targetHeight) throws Exception {
+        final BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeStream(context.getContentResolver().openInputStream(uri), null, options);
+
+        if (targetHeight == 0) {
+            targetHeight = (int) (options.outHeight * targetWidth / (double) options.outWidth);
+        }
+
+        if (targetWidth == 0) {
+            targetWidth = (int) (options.outWidth * targetHeight / (double) options.outHeight);
+        }
+        options.inSampleSize = calculateInSampleSize(options, targetWidth, targetHeight);
+        options.inJustDecodeBounds = false;
+        Bitmap bitmap = BitmapFactory.decodeStream(context.getContentResolver().openInputStream(uri), null, options);
+        return bitmap;
+    }
+
+
+    private Runnable savePhotoRunnable = new Runnable() {
+        @Override
+        public void run() {
+            final Callback callback = (Callback) getActivity();
+            try {
+                File file = outputPhoto;
+                if(file.getParentFile().exists())
+                    file.getParentFile().mkdirs();
+                GPUImage tempImage = new GPUImage(getActivity());
+
+                Bitmap bitmap = decodeUriAsBitmap(getActivity(), inputPhoto, maxImageWidth, maxImageHeight);
+                tempImage.setFilter(groupFilter);
+                FileOutputStream outStream = new FileOutputStream(file);
+                Bitmap bitmapApply = tempImage.getBitmapWithFilterApplied(bitmap);
+                bitmapApply.compress(Bitmap.CompressFormat.JPEG, 90, outStream);
+                bitmap.recycle();
+                bitmapApply.recycle();
+            } catch (Exception e) {
+                Log.e(TAG, e.getMessage(), e);
             }
 
-            @Override
-            protected Void doInBackground(Void... params) {
-                try {
-                    File file = outputPhoto;
-                    if(file.getParentFile().exists())
-                        file.getParentFile().mkdirs();
-                    GPUImage tempImage = new GPUImage(getActivity());
-                    InputStream stream = getActivity().getContentResolver().openInputStream(inputPhoto);
-                    Bitmap bitmap = BitmapFactory.decodeStream(stream);
-                    tempImage.setFilter(groupFilter);
-                    FileOutputStream outStream = new FileOutputStream(file);
-                    Bitmap bitmapApply = tempImage.getBitmapWithFilterApplied(bitmap);
-                    bitmapApply.compress(Bitmap.CompressFormat.JPEG, 90, outStream);
-                    bitmap.recycle();
-                    bitmapApply.recycle();
-                } catch (Exception e) {
-                    Log.e(TAG, e.getMessage(), e);
+            uiHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    callback.onSaved();
+                    Intent intent = new Intent();
+                    intent.setData(Uri.fromFile(outputPhoto));
+                    getActivity().setResult(Activity.RESULT_OK, intent);
+                    getActivity().finish();
                 }
-                return null;
-            }
-        }.execute();
+            });
+
+
+
+        }
+    };
+
+    public void setMaxImageWidth(int maxImageWidth) {
+        this.maxImageWidth = maxImageWidth;
+    }
+
+
+
+    public void setMaxImageHeight(int maxImageHeight) {
+        this.maxImageHeight = maxImageHeight;
+    }
+
+
+
+    private void savePhoto() {
+        workingHandler.post(savePhotoRunnable);
     }
 
     public void setmGPUImage(GPUImageView mGPUImage) {

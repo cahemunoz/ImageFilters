@@ -17,6 +17,9 @@ public class FiltersActivity extends AppCompatActivity implements FiltersFragmen
     public static final int REQUEST_FILTER = 3751;
     public static final String INTENT_INPUT_FILE_URI = "inputFile";
     public static final String INTENT_OUTPUT_FILE = "outputFile";
+    public static final String INTENT_INPUT_IMAGE_WIDTH = "imageWidth";
+    public static final String INTENT_INPUT_IMAGE_HEIGHT = "imageWidth";
+    private static final int DEFAULT_IMAGE_SIZE = 1500;
 
     private FiltersFragment filtersFragment;
     private ProgressBar progressBar;
@@ -42,8 +45,14 @@ public class FiltersActivity extends AppCompatActivity implements FiltersFragmen
     public void loadImage() {
         Uri inputFile = getIntent().getParcelableExtra(INTENT_INPUT_FILE_URI);
         String output = getIntent().getStringExtra(INTENT_OUTPUT_FILE);
+        int maxImageWidth = getIntent().getIntExtra(INTENT_INPUT_IMAGE_WIDTH, DEFAULT_IMAGE_SIZE);
+        int maxImageHeight = getIntent().getIntExtra(INTENT_INPUT_IMAGE_HEIGHT, DEFAULT_IMAGE_SIZE);
         GPUImageView mImageView = (GPUImageView) findViewById(R.id.surfaceView);
         mImageView.setImage(inputFile); // this loads image on the current thread, should be run in a thread
+
+        filtersFragment.setMaxImageHeight(maxImageHeight);
+        filtersFragment.setMaxImageWidth(maxImageWidth);
+        filtersFragment.setmGPUImage(mImageView);
         filtersFragment.setmGPUImage(mImageView);
         filtersFragment.setInputPhoto(inputFile);
         filtersFragment.setOutputPhoto(new File(output));
