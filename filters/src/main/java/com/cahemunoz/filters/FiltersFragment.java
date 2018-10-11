@@ -320,6 +320,14 @@ public class FiltersFragment extends Fragment {
         @Override
         public void run() {
             final Callback callback = (Callback) getActivity();
+
+            uiHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    callback.onSave();
+                }
+            });
+
             try {
                 File file = outputPhoto;
                 if(file.getParentFile().exists())
